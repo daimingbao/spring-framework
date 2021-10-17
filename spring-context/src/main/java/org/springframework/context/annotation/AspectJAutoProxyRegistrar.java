@@ -33,6 +33,8 @@ import org.springframework.core.type.AnnotationMetadata;
  */
 class AspectJAutoProxyRegistrar implements ImportBeanDefinitionRegistrar {
 
+	//处理开启aop注解功能
+	// 注册AnnotationAwareAspectJAutoProxyCreator的bean定义，用来解析初始化代理对象
 	/**
 	 * Register, escalate, and configure the AspectJ auto proxy creator based on the value
 	 * of the @{@link EnableAspectJAutoProxy#proxyTargetClass()} attribute on the importing

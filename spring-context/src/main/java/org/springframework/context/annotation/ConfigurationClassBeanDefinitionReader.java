@@ -140,8 +140,9 @@ class ConfigurationClassBeanDefinitionReader {
 		for (BeanMethod beanMethod : configClass.getBeanMethods()) {
 			loadBeanDefinitionsForBeanMethod(beanMethod);
 		}
-
+		//注册import的bean定义，导入相关声明类
 		loadBeanDefinitionsFromImportedResources(configClass.getImportedResources());
+		//根据实现了ImportBeanDefinitionRegistrar接口类，导入beanDefinition
 		loadBeanDefinitionsFromRegistrars(configClass.getImportBeanDefinitionRegistrars());
 	}
 
@@ -359,6 +360,7 @@ class ConfigurationClassBeanDefinitionReader {
 		});
 	}
 
+	//注册aop处理器，自动代理类创建
 	private void loadBeanDefinitionsFromRegistrars(Map<ImportBeanDefinitionRegistrar, AnnotationMetadata> registrars) {
 		registrars.forEach((registrar, metadata) ->
 				registrar.registerBeanDefinitions(metadata, this.registry));

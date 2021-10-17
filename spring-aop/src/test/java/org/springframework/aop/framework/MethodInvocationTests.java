@@ -40,18 +40,27 @@ public class MethodInvocationTests {
 		Method m = Object.class.getMethod("hashCode");
 		Object proxy = new Object();
 		final Object returnValue = new Object();
+		final Object target = new Object();
 		List<Object> is = new LinkedList<>();
 		is.add(new MethodInterceptor() {
 			@Override
 			public Object invoke(MethodInvocation invocation) throws Throwable {
+				invocation.proceed();
+				System.out.println("拦截器1");
 				return returnValue;
 			}
 		});
-			ReflectiveMethodInvocation invocation = new ReflectiveMethodInvocation(proxy, null, //?
-		m, null, null, is // list
-	);
+		is.add(new MethodInterceptor() {
+			@Override
+			public Object invoke(MethodInvocation invocation) throws Throwable {
+				Object proceed = invocation.proceed();
+				System.out.println("拦截器2");
+				return "1";
+			}
+		});
+		ReflectiveMethodInvocation invocation = new ReflectiveMethodInvocation(proxy, target,m, null, null, is);
 		Object rv = invocation.proceed();
-		assertTrue("correct response", rv == returnValue);
+//		assertTrue("correct response", rv == returnValue);
 	}
 
 	/**

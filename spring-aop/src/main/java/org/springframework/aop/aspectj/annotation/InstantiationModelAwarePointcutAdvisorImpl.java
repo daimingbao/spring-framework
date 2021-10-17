@@ -99,6 +99,7 @@ final class InstantiationModelAwarePointcutAdvisorImpl
 			Pointcut preInstantiationPointcut = Pointcuts.union(
 					aspectInstanceFactory.getAspectMetadata().getPerClausePointcut(), this.declaredPointcut);
 
+			//构建动态的advice 再调用的时候还需要再次匹配是否需要执行切面
 			// Make it dynamic: must mutate from pre-instantiation to post-instantiation state.
 			// If it's not a dynamic pointcut, it may be optimized out
 			// by the Spring AOP infrastructure after the first evaluation.
@@ -107,6 +108,7 @@ final class InstantiationModelAwarePointcutAdvisorImpl
 			this.lazy = true;
 		}
 		else {
+			//静态的advice
 			// A singleton aspect.
 			this.pointcut = this.declaredPointcut;
 			this.lazy = false;

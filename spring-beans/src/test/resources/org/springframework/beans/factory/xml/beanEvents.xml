@@ -10,8 +10,8 @@
 
 	<alias name="testBean" alias="testBeanAlias2"/>
 
-	<bean id="testBean" class="org.springframework.tests.sample.beans.TestBean">
-		<constructor-arg type="java.lang.String" value="Rob Harrop"/>
+	<bean id="testBean"   class="org.springframework.tests.sample.beans.TestBean">
+		<constructor-arg  type="java.lang.String" value="Rob Harrop"/>
 		<property name="friends">
 			<ref bean="testBean2"/>
 		</property>

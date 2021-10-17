@@ -72,7 +72,7 @@ public class BeansDtdResolver implements EntityResolver {
 					InputSource source = new InputSource(resource.getInputStream());
 					source.setPublicId(publicId);
 					source.setSystemId(systemId);
-					if (logger.isTraceEnabled()) {
+ 					if (logger.isTraceEnabled()) {
 						logger.trace("Found beans DTD [" + systemId + "] in classpath: " + dtdFile);
 					}
 					return source;

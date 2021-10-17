@@ -35,6 +35,11 @@ import org.springframework.core.type.AnnotationMetadata;
  * @since 3.1
  * @see EnableAspectJAutoProxy
  */
+
+//对自定义的配置代理的类进行解析
+// 注册InfrastructureAdvisorAutoProxyCreator类进行代理类解析与初始化
+	//比如事务管理开启注解 EnableTransactionManagement里面有proxyTargetClass和mode使用
+	//再比如spring缓存管理
 public class AutoProxyRegistrar implements ImportBeanDefinitionRegistrar {
 
 	private final Log logger = LogFactory.getLog(getClass());
@@ -69,6 +74,7 @@ public class AutoProxyRegistrar implements ImportBeanDefinitionRegistrar {
 					Boolean.class == proxyTargetClass.getClass()) {
 				candidateFound = true;
 				if (mode == AdviceMode.PROXY) {
+					//注册InfrastructureAdvisorAutoProxyCreator类进行代理类解析与初始化
 					AopConfigUtils.registerAutoProxyCreatorIfNecessary(registry);
 					if ((Boolean) proxyTargetClass) {
 						AopConfigUtils.forceAutoProxyCreatorToUseClassProxying(registry);

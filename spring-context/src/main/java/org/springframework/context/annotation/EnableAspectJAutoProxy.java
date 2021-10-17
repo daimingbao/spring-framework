@@ -120,8 +120,10 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 @Import(AspectJAutoProxyRegistrar.class)
+//开启处理Aspect注解的功能
 public @interface EnableAspectJAutoProxy {
 
+	//是否使用cglib生成代理类
 	/**
 	 * Indicate whether subclass-based (CGLIB) proxies are to be created as opposed
 	 * to standard Java interface-based proxies. The default is {@code false}.
@@ -134,6 +136,7 @@ public @interface EnableAspectJAutoProxy {
 	 * Off by default, i.e. no guarantees that {@code AopContext} access will work.
 	 * @since 4.3.1
 	 */
+	// 是否向外暴露代理对象，通过threadlocal暴露
 	boolean exposeProxy() default false;
 
 }

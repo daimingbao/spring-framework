@@ -16,6 +16,7 @@
 
 package org.springframework.web.context;
 
+import java.io.IOException;
 import java.util.EventListener;
 import javax.servlet.ServletContextEvent;
 import javax.servlet.ServletException;
@@ -52,7 +53,9 @@ public class ContextLoaderInitializerTests {
 	}
 
 	@Test
-	public void register() throws ServletException {
+	public void register() throws ServletException, IOException {
+
+
 		initializer.onStartup(servletContext);
 
 		assertTrue(eventListener instanceof ContextLoaderListener);
@@ -64,6 +67,8 @@ public class ContextLoaderInitializerTests {
 
 		assertTrue(applicationContext.containsBean(BEAN_NAME));
 		assertTrue(applicationContext.getBean(BEAN_NAME) instanceof MyBean);
+
+		System.in.read();
 	}
 
 	private class MyMockServletContext extends MockServletContext {

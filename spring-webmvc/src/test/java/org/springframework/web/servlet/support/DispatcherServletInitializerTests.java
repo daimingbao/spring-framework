@@ -29,6 +29,7 @@ import org.springframework.mock.web.test.MockServletContext;
 import org.springframework.web.context.WebApplicationContext;
 import org.springframework.web.context.support.StaticWebApplicationContext;
 import org.springframework.web.servlet.DispatcherServlet;
+import org.springframework.web.servlet.FoxController;
 
 import static org.junit.Assert.*;
 
@@ -66,6 +67,7 @@ public class DispatcherServletInitializerTests {
 		assertEquals(MyDispatcherServlet.class, servlet.getClass());
 		WebApplicationContext servletContext = servlet.getWebApplicationContext();
 
+		FoxController foxController = servletContext.getBean("foxController", FoxController.class);
 		assertTrue(servletContext.containsBean("bean"));
 		assertTrue(servletContext.getBean("bean") instanceof MyBean);
 
@@ -105,7 +107,9 @@ public class DispatcherServletInitializerTests {
 		@Override
 		protected WebApplicationContext createServletApplicationContext() {
 			StaticWebApplicationContext servletContext = new StaticWebApplicationContext();
+
 			servletContext.registerSingleton("bean", MyBean.class);
+			servletContext.registerSingleton("foxController", FoxController.class);
 			return servletContext;
 		}
 

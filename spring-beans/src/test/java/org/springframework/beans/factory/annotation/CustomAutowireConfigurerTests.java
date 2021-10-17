@@ -24,6 +24,9 @@ import org.springframework.beans.factory.support.AutowireCandidateResolver;
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.beans.factory.xml.XmlBeanDefinitionReader;
 
+import java.util.HashSet;
+import java.util.Set;
+
 import static org.junit.Assert.*;
 import static org.springframework.tests.TestResourceUtils.*;
 
@@ -43,9 +46,12 @@ public class CustomAutowireConfigurerTests {
 				qualifiedResource(CustomAutowireConfigurerTests.class, "context.xml"));
 
 		CustomAutowireConfigurer cac = new CustomAutowireConfigurer();
+
 		CustomResolver customResolver = new CustomResolver();
 		bf.setAutowireCandidateResolver(customResolver);
 		cac.postProcessBeanFactory(bf);
+		Set set = new HashSet();
+
 		TestBean testBean = (TestBean) bf.getBean("testBean");
 		assertEquals("#1!", testBean.getName());
 	}
@@ -53,6 +59,7 @@ public class CustomAutowireConfigurerTests {
 
 	public static class TestBean {
 
+		@Qualifier(value = "one")
 		private String name;
 
 		public TestBean(String name) {
@@ -65,7 +72,7 @@ public class CustomAutowireConfigurerTests {
 	}
 
 
-	public static class CustomResolver implements AutowireCandidateResolver {
+	public static class CustomResolver extends QualifierAnnotationAutowireCandidateResolver implements AutowireCandidateResolver {
 
 		@Override
 		public boolean isAutowireCandidate(BeanDefinitionHolder bdHolder, DependencyDescriptor descriptor) {

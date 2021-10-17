@@ -8,7 +8,7 @@
 	<Loggers>
 		<Logger name="org.springframework.web.servlet" level="warn" />
 		<Logger name="org.springframework.convert" level="warn" />
-		<Root level="error">
+		<Root level="info">
 			<AppenderRef ref="Console" />
 		</Root>
 	</Loggers>

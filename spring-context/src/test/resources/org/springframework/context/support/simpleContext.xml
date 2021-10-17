@@ -10,4 +10,9 @@
 		<constructor-arg value="someNonExistentFile.xml"/>
 	</bean>
 
+	<bean class="org.springframework.context.autowirebean.DemoA" id="demoA" autowire="byType" />
+	<bean class="org.springframework.context.autowirebean.DemoB" autowire="byType" >
+		<constructor-arg ref="demoA" ></constructor-arg>
+	</bean>
+
 </beans>

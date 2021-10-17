@@ -16,19 +16,8 @@
 
 package org.springframework.web.servlet;
 
-import java.io.IOException;
-import java.util.Locale;
-import javax.servlet.Servlet;
-import javax.servlet.ServletConfig;
-import javax.servlet.ServletContext;
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletRequestWrapper;
-import javax.servlet.http.HttpServletResponse;
-
 import org.junit.Before;
 import org.junit.Test;
-
 import org.springframework.beans.MutablePropertyValues;
 import org.springframework.beans.PropertyValue;
 import org.springframework.context.ApplicationContextInitializer;
@@ -41,12 +30,7 @@ import org.springframework.mock.web.test.MockHttpServletResponse;
 import org.springframework.mock.web.test.MockServletConfig;
 import org.springframework.mock.web.test.MockServletContext;
 import org.springframework.tests.sample.beans.TestBean;
-import org.springframework.web.context.ConfigurableWebApplicationContext;
-import org.springframework.web.context.ConfigurableWebEnvironment;
-import org.springframework.web.context.ContextLoader;
-import org.springframework.web.context.ServletConfigAwareBean;
-import org.springframework.web.context.ServletContextAwareBean;
-import org.springframework.web.context.WebApplicationContext;
+import org.springframework.web.context.*;
 import org.springframework.web.context.support.StandardServletEnvironment;
 import org.springframework.web.context.support.StaticWebApplicationContext;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
@@ -57,6 +41,16 @@ import org.springframework.web.servlet.handler.SimpleUrlHandlerMapping;
 import org.springframework.web.servlet.mvc.Controller;
 import org.springframework.web.servlet.view.InternalResourceViewResolver;
 import org.springframework.web.util.WebUtils;
+
+import javax.servlet.Servlet;
+import javax.servlet.ServletConfig;
+import javax.servlet.ServletContext;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletRequestWrapper;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.util.Locale;
 
 import static org.hamcrest.CoreMatchers.*;
 import static org.junit.Assert.*;
@@ -69,6 +63,8 @@ import static org.mockito.Mockito.*;
  * @author Sam Brannen
  */
 public class DispatcherServletTests {
+
+//	private Logger log = LogManager.getLogger(getClass());
 
 	private static final String URL_KNOWN_ONLY_PARENT = "/knownOnlyToParent.do";
 
@@ -101,6 +97,171 @@ public class DispatcherServletTests {
 		return servletConfig.getServletContext();
 	}
 
+
+	@Test
+	public void detectHandlerMappingFromParent() throws ServletException, IOException {
+		// create a parent context that includes a mapping
+		StaticWebApplicationContext parent = new StaticWebApplicationContext();
+		parent.setServletContext(getServletContext());
+		parent.registerSingleton("parentHandler", ControllerFromParent.class, new MutablePropertyValues());
+
+		MutablePropertyValues pvs = new MutablePropertyValues();
+		pvs.addPropertyValue(new PropertyValue("mappings", URL_KNOWN_ONLY_PARENT + "=parentHandler"));
+
+		parent.registerSingleton("parentMapping", SimpleUrlHandlerMapping.class, pvs);
+		parent.refresh();
+
+		DispatcherServlet complexDispatcherServlet = new DispatcherServlet();
+		// will have parent
+		complexDispatcherServlet.setContextClass(ComplexWebApplicationContext.class);
+		complexDispatcherServlet.setNamespace("test");
+
+		ServletConfig config = new MockServletConfig(getServletContext(), "complex");
+		config.getServletContext().setAttribute(WebApplicationContext.ROOT_WEB_APPLICATION_CONTEXT_ATTRIBUTE, parent);
+		complexDispatcherServlet.init(config);
+
+		MockHttpServletRequest request = new MockHttpServletRequest(getServletContext(), "GET", URL_KNOWN_ONLY_PARENT);
+		MockHttpServletResponse response = new MockHttpServletResponse();
+		complexDispatcherServlet.service(request, response);
+
+		assertFalse("Matched through parent controller/handler pair: not response=" + response.getStatus(),
+				response.getStatus() == HttpServletResponse.SC_NOT_FOUND);
+	}
+
+
+	@Test
+	public void notDetectAllHandlerMappings() throws ServletException, IOException {
+		DispatcherServlet complexDispatcherServlet = new DispatcherServlet();
+		complexDispatcherServlet.setContextClass(ComplexWebApplicationContext.class);
+		complexDispatcherServlet.setNamespace("test");
+		complexDispatcherServlet.setDetectAllHandlerMappings(false);
+		complexDispatcherServlet.init(new MockServletConfig(getServletContext(), "complex"));
+
+		MockHttpServletRequest request = new MockHttpServletRequest(getServletContext(), "GET", "/unknown.do");
+		MockHttpServletResponse response = new MockHttpServletResponse();
+		complexDispatcherServlet.service(request, response);
+		assertTrue(response.getStatus() == HttpServletResponse.SC_NOT_FOUND);
+	}
+
+	@Test
+	public void handlerNotMappedWithAutodetect() throws ServletException, IOException {
+		DispatcherServlet complexDispatcherServlet = new DispatcherServlet();
+		// no parent
+		complexDispatcherServlet.setContextClass(ComplexWebApplicationContext.class);
+		complexDispatcherServlet.setNamespace("test");
+		complexDispatcherServlet.init(new MockServletConfig(getServletContext(), "complex"));
+
+		MockHttpServletRequest request = new MockHttpServletRequest(getServletContext(), "GET", URL_KNOWN_ONLY_PARENT);
+		MockHttpServletResponse response = new MockHttpServletResponse();
+		complexDispatcherServlet.service(request, response);
+		assertEquals(HttpServletResponse.SC_NOT_FOUND, response.getStatus());
+	}
+
+
+
+	@Test
+	public void detectAllHandlerAdapters() throws ServletException, IOException {
+		DispatcherServlet complexDispatcherServlet = new DispatcherServlet();
+		complexDispatcherServlet.setContextClass(ComplexWebApplicationContext.class);
+		complexDispatcherServlet.setNamespace("test");
+		complexDispatcherServlet.init(new MockServletConfig(getServletContext(), "complex"));
+
+		MockHttpServletRequest request = new MockHttpServletRequest(getServletContext(), "GET", "/servlet.do");
+		MockHttpServletResponse response = new MockHttpServletResponse();
+		complexDispatcherServlet.service(request, response);
+		assertEquals("body", response.getContentAsString());
+
+		request = new MockHttpServletRequest(getServletContext(), "GET", "/form.do");
+		response = new MockHttpServletResponse();
+		complexDispatcherServlet.service(request, response);
+	}
+
+	@Test
+	public void notDetectAllHandlerAdapters() throws ServletException, IOException {
+		DispatcherServlet complexDispatcherServlet = new DispatcherServlet();
+		complexDispatcherServlet.setContextClass(ComplexWebApplicationContext.class);
+		complexDispatcherServlet.setNamespace("test");
+		complexDispatcherServlet.setDetectAllHandlerAdapters(false);
+		complexDispatcherServlet.init(new MockServletConfig(getServletContext(), "complex"));
+
+		// only ServletHandlerAdapter with bean name "handlerAdapter" detected
+		MockHttpServletRequest request = new MockHttpServletRequest(getServletContext(), "GET", "/servlet.do");
+		MockHttpServletResponse response = new MockHttpServletResponse();
+		complexDispatcherServlet.service(request, response);
+		assertEquals("body", response.getContentAsString());
+
+		// SimpleControllerHandlerAdapter not detected
+		request = new MockHttpServletRequest(getServletContext(), "GET", "/form.do");
+		response = new MockHttpServletResponse();
+		complexDispatcherServlet.service(request, response);
+		assertEquals("forwarded to failed", "failed0.jsp", response.getForwardedUrl());
+		assertTrue("Exception exposed", request.getAttribute("exception").getClass().equals(ServletException.class));
+	}
+
+	@Test
+	public void notDetectAllHandlerExceptionResolvers() throws ServletException, IOException {
+		DispatcherServlet complexDispatcherServlet = new DispatcherServlet();
+		complexDispatcherServlet.setContextClass(ComplexWebApplicationContext.class);
+		complexDispatcherServlet.setNamespace("test");
+		complexDispatcherServlet.setDetectAllHandlerExceptionResolvers(false);
+		complexDispatcherServlet.init(new MockServletConfig(getServletContext(), "complex"));
+
+		MockHttpServletRequest request = new MockHttpServletRequest(getServletContext(), "GET", "/unknown.do");
+		MockHttpServletResponse response = new MockHttpServletResponse();
+		try {
+			complexDispatcherServlet.service(request, response);
+			fail("Should have thrown ServletException");
+		} catch (ServletException ex) {
+			// expected
+			assertTrue(ex.getMessage().contains("No adapter for handler"));
+		}
+	}
+
+	@Test
+	public void notDetectAllViewResolvers() throws ServletException, IOException {
+		DispatcherServlet complexDispatcherServlet = new DispatcherServlet();
+		complexDispatcherServlet.setContextClass(ComplexWebApplicationContext.class);
+		complexDispatcherServlet.setNamespace("test");
+		complexDispatcherServlet.setDetectAllViewResolvers(false);
+		complexDispatcherServlet.init(new MockServletConfig(getServletContext(), "complex"));
+
+		MockHttpServletRequest request = new MockHttpServletRequest(getServletContext(), "GET", "/unknown.do");
+		MockHttpServletResponse response = new MockHttpServletResponse();
+		try {
+			complexDispatcherServlet.service(request, response);
+			fail("Should have thrown ServletException");
+		} catch (ServletException ex) {
+			// expected
+			assertTrue(ex.getMessage().contains("failed0"));
+		}
+	}
+
+	@Test
+	public void throwExceptionIfNoHandlerFound() throws ServletException, IOException {
+		DispatcherServlet complexDispatcherServlet = new DispatcherServlet();
+		complexDispatcherServlet.setContextClass(SimpleWebApplicationContext.class);
+		complexDispatcherServlet.setNamespace("test");
+		complexDispatcherServlet.setThrowExceptionIfNoHandlerFound(true);
+		complexDispatcherServlet.init(new MockServletConfig(getServletContext(), "complex"));
+
+		MockHttpServletRequest request = new MockHttpServletRequest(getServletContext(), "GET", "/unknown");
+		MockHttpServletResponse response = new MockHttpServletResponse();
+
+		complexDispatcherServlet.service(request, response);
+		assertTrue("correct error code", response.getStatus() == HttpServletResponse.SC_NOT_FOUND);
+	}
+
+	// SPR-12984
+
+	@Test
+	public void noHandlerFoundExceptionMessage() {
+		HttpHeaders headers = new HttpHeaders();
+		headers.add("foo", "bar");
+		NoHandlerFoundException ex = new NoHandlerFoundException("GET", "/foo", headers);
+		assertTrue(!ex.getMessage().contains("bar"));
+		assertTrue(!ex.toString().contains("bar"));
+	}
+
 	@Test
 	public void configuredDispatcherServlets() {
 		assertTrue("Correct namespace",
@@ -125,6 +286,8 @@ public class DispatcherServletTests {
 		MockHttpServletRequest request = new MockHttpServletRequest(getServletContext(), "GET", "/invalid.do");
 		MockHttpServletResponse response = new MockHttpServletResponse();
 		simpleDispatcherServlet.service(request, response);
+		System.out.println(String.format("{0}", request));
+		System.out.println(String.format("{0}", response));
 		assertTrue("Not forwarded", response.getForwardedUrl() == null);
 		assertTrue("correct error code", response.getStatus() == HttpServletResponse.SC_NOT_FOUND);
 	}
@@ -285,8 +448,7 @@ public class DispatcherServletTests {
 			complexDispatcherServlet.service(request, response);
 			assertEquals(200, response.getStatus());
 			assertTrue("forwarded to failed", "failed1.jsp".equals(response.getForwardedUrl()));
-		}
-		catch (ServletException ex) {
+		} catch (ServletException ex) {
 			fail("Should not have thrown ServletException: " + ex.getMessage());
 		}
 	}
@@ -405,8 +567,7 @@ public class DispatcherServletTests {
 		try {
 			complexDispatcherServlet.service(request, response);
 			assertTrue("Not forwarded", response.getForwardedUrl() == null);
-		}
-		catch (ServletException ex) {
+		} catch (ServletException ex) {
 			fail("Should not have thrown ServletException: " + ex.getMessage());
 		}
 	}
@@ -419,8 +580,7 @@ public class DispatcherServletTests {
 		try {
 			complexDispatcherServlet.service(request, response);
 			assertTrue("Correct response", response.getStatus() == HttpServletResponse.SC_FORBIDDEN);
-		}
-		catch (ServletException ex) {
+		} catch (ServletException ex) {
 			fail("Should not have thrown ServletException: " + ex.getMessage());
 		}
 	}
@@ -451,168 +611,7 @@ public class DispatcherServletTests {
 		assertEquals("body", response.getContentAsString());
 	}
 
-	@Test
-	public void notDetectAllHandlerMappings() throws ServletException, IOException {
-		DispatcherServlet complexDispatcherServlet = new DispatcherServlet();
-		complexDispatcherServlet.setContextClass(ComplexWebApplicationContext.class);
-		complexDispatcherServlet.setNamespace("test");
-		complexDispatcherServlet.setDetectAllHandlerMappings(false);
-		complexDispatcherServlet.init(new MockServletConfig(getServletContext(), "complex"));
 
-		MockHttpServletRequest request = new MockHttpServletRequest(getServletContext(), "GET", "/unknown.do");
-		MockHttpServletResponse response = new MockHttpServletResponse();
-		complexDispatcherServlet.service(request, response);
-		assertTrue(response.getStatus() == HttpServletResponse.SC_NOT_FOUND);
-	}
-
-	@Test
-	public void handlerNotMappedWithAutodetect() throws ServletException, IOException {
-		DispatcherServlet complexDispatcherServlet = new DispatcherServlet();
-		// no parent
-		complexDispatcherServlet.setContextClass(ComplexWebApplicationContext.class);
-		complexDispatcherServlet.setNamespace("test");
-		complexDispatcherServlet.init(new MockServletConfig(getServletContext(), "complex"));
-
-		MockHttpServletRequest request = new MockHttpServletRequest(getServletContext(), "GET", URL_KNOWN_ONLY_PARENT);
-		MockHttpServletResponse response = new MockHttpServletResponse();
-		complexDispatcherServlet.service(request, response);
-		assertEquals(HttpServletResponse.SC_NOT_FOUND, response.getStatus());
-	}
-
-	@Test
-	public void detectHandlerMappingFromParent() throws ServletException, IOException {
-		// create a parent context that includes a mapping
-		StaticWebApplicationContext parent = new StaticWebApplicationContext();
-		parent.setServletContext(getServletContext());
-		parent.registerSingleton("parentHandler", ControllerFromParent.class, new MutablePropertyValues());
-
-		MutablePropertyValues pvs = new MutablePropertyValues();
-		pvs.addPropertyValue(new PropertyValue("mappings", URL_KNOWN_ONLY_PARENT + "=parentHandler"));
-
-		parent.registerSingleton("parentMapping", SimpleUrlHandlerMapping.class, pvs);
-		parent.refresh();
-
-		DispatcherServlet complexDispatcherServlet = new DispatcherServlet();
-		// will have parent
-		complexDispatcherServlet.setContextClass(ComplexWebApplicationContext.class);
-		complexDispatcherServlet.setNamespace("test");
-
-		ServletConfig config = new MockServletConfig(getServletContext(), "complex");
-		config.getServletContext().setAttribute(WebApplicationContext.ROOT_WEB_APPLICATION_CONTEXT_ATTRIBUTE, parent);
-		complexDispatcherServlet.init(config);
-
-		MockHttpServletRequest request = new MockHttpServletRequest(getServletContext(), "GET", URL_KNOWN_ONLY_PARENT);
-		MockHttpServletResponse response = new MockHttpServletResponse();
-		complexDispatcherServlet.service(request, response);
-
-		assertFalse("Matched through parent controller/handler pair: not response=" + response.getStatus(),
-				response.getStatus() == HttpServletResponse.SC_NOT_FOUND);
-	}
-
-	@Test
-	public void detectAllHandlerAdapters() throws ServletException, IOException {
-		DispatcherServlet complexDispatcherServlet = new DispatcherServlet();
-		complexDispatcherServlet.setContextClass(ComplexWebApplicationContext.class);
-		complexDispatcherServlet.setNamespace("test");
-		complexDispatcherServlet.init(new MockServletConfig(getServletContext(), "complex"));
-
-		MockHttpServletRequest request = new MockHttpServletRequest(getServletContext(), "GET", "/servlet.do");
-		MockHttpServletResponse response = new MockHttpServletResponse();
-		complexDispatcherServlet.service(request, response);
-		assertEquals("body", response.getContentAsString());
-
-		request = new MockHttpServletRequest(getServletContext(), "GET", "/form.do");
-		response = new MockHttpServletResponse();
-		complexDispatcherServlet.service(request, response);
-	}
-
-	@Test
-	public void notDetectAllHandlerAdapters() throws ServletException, IOException {
-		DispatcherServlet complexDispatcherServlet = new DispatcherServlet();
-		complexDispatcherServlet.setContextClass(ComplexWebApplicationContext.class);
-		complexDispatcherServlet.setNamespace("test");
-		complexDispatcherServlet.setDetectAllHandlerAdapters(false);
-		complexDispatcherServlet.init(new MockServletConfig(getServletContext(), "complex"));
-
-		// only ServletHandlerAdapter with bean name "handlerAdapter" detected
-		MockHttpServletRequest request = new MockHttpServletRequest(getServletContext(), "GET", "/servlet.do");
-		MockHttpServletResponse response = new MockHttpServletResponse();
-		complexDispatcherServlet.service(request, response);
-		assertEquals("body", response.getContentAsString());
-
-		// SimpleControllerHandlerAdapter not detected
-		request = new MockHttpServletRequest(getServletContext(), "GET", "/form.do");
-		response = new MockHttpServletResponse();
-		complexDispatcherServlet.service(request, response);
-		assertEquals("forwarded to failed", "failed0.jsp", response.getForwardedUrl());
-		assertTrue("Exception exposed", request.getAttribute("exception").getClass().equals(ServletException.class));
-	}
-
-	@Test
-	public void notDetectAllHandlerExceptionResolvers() throws ServletException, IOException {
-		DispatcherServlet complexDispatcherServlet = new DispatcherServlet();
-		complexDispatcherServlet.setContextClass(ComplexWebApplicationContext.class);
-		complexDispatcherServlet.setNamespace("test");
-		complexDispatcherServlet.setDetectAllHandlerExceptionResolvers(false);
-		complexDispatcherServlet.init(new MockServletConfig(getServletContext(), "complex"));
-
-		MockHttpServletRequest request = new MockHttpServletRequest(getServletContext(), "GET", "/unknown.do");
-		MockHttpServletResponse response = new MockHttpServletResponse();
-		try {
-			complexDispatcherServlet.service(request, response);
-			fail("Should have thrown ServletException");
-		}
-		catch (ServletException ex) {
-			// expected
-			assertTrue(ex.getMessage().contains("No adapter for handler"));
-		}
-	}
-
-	@Test
-	public void notDetectAllViewResolvers() throws ServletException, IOException {
-		DispatcherServlet complexDispatcherServlet = new DispatcherServlet();
-		complexDispatcherServlet.setContextClass(ComplexWebApplicationContext.class);
-		complexDispatcherServlet.setNamespace("test");
-		complexDispatcherServlet.setDetectAllViewResolvers(false);
-		complexDispatcherServlet.init(new MockServletConfig(getServletContext(), "complex"));
-
-		MockHttpServletRequest request = new MockHttpServletRequest(getServletContext(), "GET", "/unknown.do");
-		MockHttpServletResponse response = new MockHttpServletResponse();
-		try {
-			complexDispatcherServlet.service(request, response);
-			fail("Should have thrown ServletException");
-		}
-		catch (ServletException ex) {
-			// expected
-			assertTrue(ex.getMessage().contains("failed0"));
-		}
-	}
-
-	@Test
-	public void throwExceptionIfNoHandlerFound() throws ServletException, IOException {
-		DispatcherServlet complexDispatcherServlet = new DispatcherServlet();
-		complexDispatcherServlet.setContextClass(SimpleWebApplicationContext.class);
-		complexDispatcherServlet.setNamespace("test");
-		complexDispatcherServlet.setThrowExceptionIfNoHandlerFound(true);
-		complexDispatcherServlet.init(new MockServletConfig(getServletContext(), "complex"));
-
-		MockHttpServletRequest request = new MockHttpServletRequest(getServletContext(), "GET", "/unknown");
-		MockHttpServletResponse response = new MockHttpServletResponse();
-
-		complexDispatcherServlet.service(request, response);
-		assertTrue("correct error code", response.getStatus() == HttpServletResponse.SC_NOT_FOUND);
-	}
-
-	// SPR-12984
-
-	@Test
-	public void noHandlerFoundExceptionMessage() {
-		HttpHeaders headers = new HttpHeaders();
-		headers.add("foo", "bar");
-		NoHandlerFoundException ex = new NoHandlerFoundException("GET", "/foo", headers);
-		assertTrue(!ex.getMessage().contains("bar"));
-		assertTrue(!ex.toString().contains("bar"));
-	}
 
 	@Test
 	public void cleanupAfterIncludeWithRemove() throws ServletException, IOException {
@@ -722,8 +721,7 @@ public class DispatcherServletTests {
 		try {
 			complexDispatcherServlet.service(request, response);
 			fail("Should have thrown ServletException");
-		}
-		catch (ServletException ex) {
+		} catch (ServletException ex) {
 			ex.printStackTrace();
 		}
 	}
@@ -801,10 +799,10 @@ public class DispatcherServletTests {
 		try {
 			servlet.setEnvironment(new DummyEnvironment());
 			fail("expected IllegalArgumentException for non-configurable Environment");
+		} catch (IllegalArgumentException ex) {
 		}
-		catch (IllegalArgumentException ex) {
+		class CustomServletEnvironment extends StandardServletEnvironment {
 		}
-		class CustomServletEnvironment extends StandardServletEnvironment { }
 		@SuppressWarnings("serial")
 		DispatcherServlet custom = new DispatcherServlet() {
 			@Override
